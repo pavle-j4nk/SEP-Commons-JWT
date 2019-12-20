@@ -1,4 +1,4 @@
-package rs.ac.uns.ftn.sep.commons.jwtsecurity.dao;
+package rs.ac.uns.ftn.sep.commons.jwtsecurity.dto;
 
 import lombok.Data;
 
