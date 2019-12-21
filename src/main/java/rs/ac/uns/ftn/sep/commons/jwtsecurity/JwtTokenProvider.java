@@ -5,7 +5,6 @@ import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -13,9 +12,7 @@ import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
-import javax.annotation.PostConstruct;
 import javax.servlet.http.HttpServletRequest;
-import java.util.Base64;
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -27,16 +24,10 @@ public class JwtTokenProvider {
     private static final String BEARER = "Bearer ";
     private static final String AUTHORITIES_CLAIMS = "aut";
 
-    @Value("${security.jwt.token.secret-key}")
-    private String secretKey;
+    private final SignatureAlgorithm algorithm = SignatureAlgorithm.RS256;
 
-    @Value("${security.jwt.token.expire-length:3600000}")
-    private long validityInMilliseconds = 3600000;
-
-    @PostConstruct
-    protected void init() {
-        secretKey = Base64.getEncoder().encodeToString(secretKey.getBytes());
-    }
+    private final JwtProperties jwtProperties;
+    private final JwtKeys keys;
 
     public String createToken(UserDetails userDetails) {
         Claims claims = Jwts.claims().setSubject(userDetails.getUsername());
@@ -44,13 +35,13 @@ public class JwtTokenProvider {
         claims.put(AUTHORITIES_CLAIMS, authorities);
 
         Date now = new Date();
-        Date validity = new Date(now.getTime() + validityInMilliseconds);
+        Date validity = new Date(now.getTime() + jwtProperties.getDurationMillis());
 
         return Jwts.builder()
                 .setClaims(claims)
                 .setIssuedAt(now)
                 .setExpiration(validity)
-                .signWith(SignatureAlgorithm.HS256, secretKey)
+                .signWith(algorithm, keys.getPrivateKey())
                 .compact();
     }
 
@@ -62,7 +53,7 @@ public class JwtTokenProvider {
     }
 
     public String getUsername(String token) {
-        return Jwts.parser().setSigningKey(secretKey).parseClaimsJws(token).getBody().getSubject();
+        return Jwts.parser().setSigningKey(keys.getPublicKey()).parseClaimsJws(token).getBody().getSubject();
     }
 
     /**
@@ -75,7 +66,7 @@ public class JwtTokenProvider {
     public String getUsernameFromExpired(String token) {
         Claims claims;
         try {
-            claims = Jwts.parser().setSigningKey(secretKey).parseClaimsJws(token).getBody();
+            claims = Jwts.parser().setSigningKey(keys.getPublicKey()).parseClaimsJws(token).getBody();
         } catch (ExpiredJwtException e) {
             claims = e.getClaims();
         }
@@ -84,7 +75,7 @@ public class JwtTokenProvider {
     }
 
     public List<GrantedAuthority> getAuthorities(String token) {
-        Claims claims = Jwts.parser().setSigningKey(secretKey).parseClaimsJws(token).getBody();
+        Claims claims = Jwts.parser().setSigningKey(keys.getPublicKey()).parseClaimsJws(token).getBody();
         List<?> authorityList = claims.get(AUTHORITIES_CLAIMS, List.class);
         String[] authorityArray = authorityList.stream().map(Object::toString).toArray(String[]::new);
         return AuthorityUtils.createAuthorityList(authorityArray);
