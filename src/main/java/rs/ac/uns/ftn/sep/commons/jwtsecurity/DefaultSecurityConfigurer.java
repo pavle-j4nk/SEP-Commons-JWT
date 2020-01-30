@@ -26,8 +26,6 @@ public class DefaultSecurityConfigurer extends SecurityConfigurerAdapter<Default
 
         JwtTokenFilter customFilter = new JwtTokenFilter(jwtTokenProvider);
         http.addFilterBefore(customFilter, UsernamePasswordAuthenticationFilter.class);
-
-        http.authorizeRequests().antMatchers("/h2-console/**").permitAll();
     }
 
 }
