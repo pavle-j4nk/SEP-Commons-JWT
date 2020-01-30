@@ -19,5 +19,8 @@ public class JwtProperties {
     /**
      * Singing key alias in keystore.
      */
-    private String signingKey = "authentication";
+    private String signingKey = "jwt_sign";
+
+    private String signingKeyPassword = "123456";
+
 }

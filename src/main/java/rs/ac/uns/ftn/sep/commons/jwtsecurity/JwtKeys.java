@@ -1,29 +1,24 @@
 package rs.ac.uns.ftn.sep.commons.jwtsecurity;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.boot.autoconfigure.web.ServerProperties;
-import org.springframework.boot.web.server.Ssl;
 import org.springframework.stereotype.Component;
-import org.springframework.util.ResourceUtils;
+import rs.ac.uns.ftn.sep.commons.ssl.SslKeys;
 
 import javax.annotation.PostConstruct;
-import java.io.FileInputStream;
-import java.io.IOException;
 import java.security.*;
 import java.security.cert.Certificate;
-import java.security.cert.CertificateException;
 
 @RequiredArgsConstructor
 @Component
 public class JwtKeys {
-    private final ServerProperties serverProperties;
+    private final SslKeys sslKeys;
     private final JwtProperties jwtProperties;
 
     private PrivateKey privateKey;
     private PublicKey publicKey;
 
     @PostConstruct
-    public void loadKeys() throws CertificateException, NoSuchAlgorithmException, KeyStoreException, IOException {
+    public void loadKeys() throws Exception {
         try {
             privateKey = loadPrivateKey();
             publicKey = loadPublicKeyFromKeystore();
@@ -40,37 +35,28 @@ public class JwtKeys {
         return publicKey;
     }
 
-    private PrivateKey loadPrivateKey() throws KeyStoreException, IOException, CertificateException, NoSuchAlgorithmException, UnrecoverableKeyException {
-        Ssl ssl = serverProperties.getSsl();
-        KeyStore keyStore = KeyStore.getInstance(ssl.getKeyStoreType());
-        keyStore.load(new FileInputStream(ResourceUtils.getFile(ssl.getKeyStore())), ssl.getKeyStorePassword().toCharArray());
+    private PrivateKey loadPrivateKey() throws KeyStoreException, NoSuchAlgorithmException, UnrecoverableKeyException {
+        KeyStore keyStore = sslKeys.getKeyStore();
 
-        String password = ssl.getKeyPassword();
+        String password = jwtProperties.getSigningKeyPassword();
         char[] passwordCharArray = password != null ? password.toCharArray() : null;
 
-        return (PrivateKey) keyStore.getKey(ssl.getKeyAlias(), passwordCharArray);
+        return (PrivateKey) keyStore.getKey(jwtProperties.getSigningKey(), passwordCharArray);
     }
 
-    private PublicKey loadPublicKeyFromKeystore() throws KeyStoreException, IOException, CertificateException, NoSuchAlgorithmException {
-        Ssl ssl = serverProperties.getSsl();
-        return loadPublicKey(ssl.getKeyStoreType(), ssl.getKeyStore(), ssl.getKeyAlias(), ssl.getKeyStorePassword());
+    private PublicKey loadPublicKeyFromKeystore() throws KeyStoreException {
+        KeyStore keyStore = sslKeys.getKeyStore();
+        return loadPublicKey(keyStore, jwtProperties.getSigningKey());
     }
 
-    private PublicKey loadPublicKeyFromTruststore() throws KeyStoreException, IOException, CertificateException, NoSuchAlgorithmException {
-        Ssl ssl = serverProperties.getSsl();
-        return loadPublicKey(ssl.getTrustStoreType(), ssl.getTrustStore(), jwtProperties.getSigningKey(), ssl.getTrustStorePassword());
+    private PublicKey loadPublicKeyFromTruststore() throws Exception {
+        KeyStore trustStore = sslKeys.getTrustStore();
+        return loadPublicKey(trustStore, jwtProperties.getSigningKey());
     }
 
-    private PublicKey loadPublicKey(String storeType, String store, String alias, String storePassword) throws KeyStoreException, IOException, CertificateException, NoSuchAlgorithmException {
-        KeyStore keyStore = KeyStore.getInstance(storeType);
-        keyStore.load(new FileInputStream(ResourceUtils.getFile(store)), passwordToCharArray(storePassword));
-
+    private PublicKey loadPublicKey(KeyStore keyStore, String alias) throws KeyStoreException {
         Certificate authenticator = keyStore.getCertificate(alias);
         return authenticator.getPublicKey();
-    }
-
-    private char[] passwordToCharArray(String password) {
-        return password != null ? password.toCharArray() : null;
     }
 
 }
